@@ -1,0 +1,421 @@
+---
+title: "Table Visualization Part 1"
+subtitle: "R Shiny with Loan"
+author: |
+  | [Youtube: https://www.youtube.com/@rshiny_with_loan](https://www.youtube.com/@rshiny_with_loan)
+  | [Website: https://loankimrobinson.com/](https://loankimrobinson.com/)
+  | [Github: https://github.com/loankimrobinson/rshiny_with_Loan](https://github.com/loankimrobinson/rshiny_with_Loan)
+  | [LinkedIn: https://www.linkedin.com/in/loan-robinson-86776994/](https://www.linkedin.com/in/loan-robinson-86776994/)
+date: "`r Sys.Date()`"
+indent: TRUE
+output:
+  html_document: 
+    self_contained: false
+    toc: true
+    toc_depth: 4
+    toc_float: false
+    theme: cerulean
+    highlight: zenburn
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(reactable.static = TRUE)
+library(reactable)
+library(reactablefmtr)
+library(htmltools)
+library(dplyr)
+library(fontawesome)
+library(DT)
+```
+
+
+```{css ref.label="styles", echo=FALSE}
+
+```
+
+
+```{css ref.label="pkgdown_styles", echo=FALSE}
+```
+
+
+### Features
+
+  * `Sticky` Columns
+  * Add logo 
+  * Add `data_bars()`
+  * Add hyperlink
+  * Nested `reactable`
+  * `icon_assign()`
+  * `htmltools()`
+  * theme
+  * Cell Style
+
+### R Library
+
+  * reactable
+  * reactablefmtr
+  * dplyr
+  * htmltools
+  * DT
+  
+### What I should think before starting building a Table Visualization
+
+ 
+#### 1. Idea
+
+ 
+
+  * What do I want to present data?
+
+  * Any summary data I should include?
+
+  * What kind of charts I should use?
+
+  * Style or No Style for each variable.
+
+  * Which variables are the most important?
+
+ 
+
+#### 2. What Are the Most Important Factors When Applying the `reactable` Package.
+
+ 
+  * Size of data (If it's too heavy, use filter options, try to use `JS`)
+
+  * Overwhelming with many charts.
+
+  * Overwhelming with many colors.
+
+  * Variable position is important.
+
+  * The width of column is important too.
+
+  * Start building a visualization table column by column
+
+ 
+
+#### 3. Let's start making a beatiful, presentable table
+
+
+#####     a. Without Applying Reactable Package
+
+```{r DT-table, echo=FALSE, warning=FALSE, message=FALSE}
+
+data <- MASS::Cars93
+data <- data[data$Make != "Mazda RX-7", ]
+data$DriveTrain <- ifelse(data$DriveTrain  == "Front", "FWD",
+                          ifelse(data$DriveTrain  == "Rear", "RWD","4WD"))
+data$Manufacturer[data$Manufacturer == "Chrylser"] <- "Chrysler"
+data$Manufacturer <- as.character(data$Manufacturer )
+data$Make <- as.character(data$Make)
+data$Cylinders <- as.numeric(data$Cylinders)
+summary_dt <- data %>% group_by(Manufacturer) %>% arrange(desc(Max.Price)) %>% slice(1)
+summary_dt <- summary_dt[, c("Manufacturer","Make","Price",
+                             "MPG.city", "MPG.highway", "Type", 
+                             "EngineSize", "Horsepower","Cylinders",
+                             "Length", "Width", 
+                             "Weight")]
+summary_dt$type_col <- ifelse(summary_dt$Type == "Small",'#011936',
+                              ifelse(summary_dt$Type == "Midsize",'#465362',
+                                     ifelse(summary_dt$Type == "Large",'#82A3A1',
+                                            ifelse(summary_dt$Type =="Van",'#9FC490','#C0DFA1'))))
+data <- data[,c("Manufacturer", "Make","Price","MPG.city","MPG.highway","Horsepower")]
+
+summary_dt <- data.frame(summary_dt)
+DT::datatable(
+              options = list(pageLength = 5, autoWidth = TRUE),
+              summary_dt[,colnames(summary_dt) != "type_col"])
+```
+
+</br>
+
+#####     b. With Reactable Package
+
+```{r table, echo=FALSE, warning=FALSE, message=FALSE}
+
+tbl <- reactable(
+  summary_dt,
+  width = 1200,
+  pagination = TRUE,
+  defaultPageSize = 10,
+  defaultSorted = "Price",
+  defaultSortOrder = "desc",
+  defaultColDef = colDef(
+    vAlign = "center",
+    headerVAlign = "bottom",
+    class = "cell",
+    headerClass = "header"
+  ),
+  detail = function(index){
+    index <- summary_dt[index,"Manufacturer"]
+    dt_detail <- data[data$Manufacturer %in% index,]
+    htmltools::div(style = "padding-left:100px;padding-top:60px;padding-bottom:60px;background-color:#FCFCFC;",
+                   reactable(
+                     dt_detail,
+                     width = "800",
+                     defaultSorted = "Price",
+                     defaultSortOrder = "desc",
+                     defaultColDef = colDef(
+                       headerStyle = list(background = "#f7f7f8", color="gray"),
+                       vAlign = "center",
+                       headerVAlign = "bottom",
+                       class = "cell",
+                       headerClass = "header"
+                     ),
+                     theme = clean(),
+                     columns = list(
+                       Manufacturer = colDef(show = F),
+                       Make  = colDef(html = TRUE, align = "center", minWidth = 150,cell = JS('
+                        function(cellInfo) {
+                        // Render as a link
+                          const url = `https://wikipedia.org/wiki/${cellInfo.value}`
+                          return `<a href="${url}" target="_blank">${cellInfo.value}</a>`
+                          }
+                        ')),
+                       Price = colDef(align = "center", minWidth = 150 ),
+
+                       MPG.city= colDef(
+                         "MPG in City",
+                         minWidth = 120,
+                         align = "left",
+                         cell = data_bars(
+                           data = dt_detail,
+                           min_value = min(dt_detail$MPG.city)-min(dt_detail$MPG.city)/15,
+                           max_value = max(dt_detail$MPG.city)+max(dt_detail$MPG.city)/15,
+                           fill_color = 'slategrey',
+                           background = '#FFFFFF',
+                           bar_height = 7,
+                           
+                           text_position = 'outside-end',
+                           icon = 'circle',
+                           icon_color = 'slategrey',
+                           icon_size = 15,
+                           text_color = 'slategrey',
+                           round_edges = TRUE
+                         )),
+                       
+                       MPG.highway = colDef(
+                         "MPG in Highway",
+                         align = "left",
+                         minWidth = 120,
+                         cell = data_bars(
+                           data = dt_detail,
+                           min_value = min(dt_detail$MPG.highway)-min(dt_detail$MPG.highway)/15,
+                           max_value = max(dt_detail$MPG.highway)+max(dt_detail$MPG.highway)/15,
+                           fill_color = 'slategrey',
+                           background = '#FFFFFF',
+                           bar_height = 7,
+                           
+                           text_position = 'outside-end',
+                           icon = 'circle',
+                           icon_color = 'slategrey',
+                           icon_size = 15,
+                           text_color = 'slategrey',
+                           round_edges = TRUE
+                         )
+                       ),
+                                              
+                       Horsepower = colDef(
+                         "Horse Power",
+                         align = 'center',
+                         minWidth = 100,
+                         style = function(value) {
+                           if (value > 200) {
+                             color <- "#008000"
+                             fontWeight = "bold"
+                           } else {
+                             color <- "gray"
+                             fontWeight = "normal"
+                           }
+                           list(color = color, fontWeight = fontWeight)
+                         }
+                       )
+                     )
+                   )
+                  )
+  },
+  columns = list(
+    Make = colDef(show = FALSE),
+    
+    Manufacturer = colDef(
+      "Make",
+      minWidth = 250,
+      sticky = "left",
+      style = list(borderRight = "1px solid #eee",backgroundColor = "#FCFCFC"),
+      cell = function(value, index) {
+        div(
+          class = "manufacturer",
+          span(img(class = "manufacturer-logo", alt = paste(value, "logo"), src =sprintf("car_logo/%s.png", value))),
+          span(class = "manufacturer-name", sprintf("%s ", summary_dt[index, "Make"]))
+        )
+      }
+    ),
+    
+    Price = colDef(
+      "Price",
+      align = 'left',
+      minWidth = 150,
+      cell = data_bars(
+        data = summary_dt,
+        fill_color = '#EEEEEE',
+        number_fmt = scales::number_format(accuracy = 0.1),
+        text_position = 'outside-end',
+        max_value = max(summary_dt$Price) + max(summary_dt$Price)/5,
+        icon = 'circle',
+        icon_color = 'slategrey',
+        icon_size = 15,
+        #text_color = 'slategrey',
+        round_edges = TRUE
+      )
+    ),
+    
+    MPG.city = colDef(
+      "MPG in City",
+      align = 'center',
+      minWidth = 100
+    ),
+    
+    MPG.highway = colDef(
+      "MPG in Highway",
+      align = 'center',
+      minWidth = 100
+    ),
+    
+    Type = colDef(
+      minWidth = 120,
+      align = 'center',
+      cell = color_tiles(
+        data = summary_dt,
+        color_ref = 'type_col',
+        opacity = 0.7,
+        bold_text = FALSE,
+        box_shadow = TRUE
+      )
+    ),
+    
+    EngineSize = colDef(
+      "Engine Size",
+      align = 'center',
+      minWidth = 100
+    ),
+    
+    Cylinders = colDef(
+      "Cylinders",
+      align = 'center',
+      minWidth = 120,
+      cell = icon_assign(
+        align = 'center',
+        summary_dt,
+        fill_color = 'slategrey',
+        empty_color = 'lightgrey',
+        empty_opacity = 0.8,
+        icon_size = 12
+      )
+    ),
+    
+    Horsepower = colDef(
+      "Horse Power",
+      align = 'center',
+      minWidth = 100,
+      style = function(value) {
+        if (value > 200) {
+          color <- "#008000"
+          fontWeight = "bold"
+        } else {
+          color <- "gray"
+          fontWeight = "normal"
+        }
+        list(color = color, fontWeight = fontWeight)
+      }
+    ),
+    
+    type_col = colDef(show = FALSE)
+  )
+)
+
+tbl
+
+
+```
+
+
+
+
+```{css styles, eval=FALSE, include = FALSE}
+
+.author {font-size: 15px;font-family: "American Typewriter", serif;color:black;}
+.title {font-family: "Snell Roundhand", cursive; font-size: 35px;font-weight:bold;}
+.date {font-family: "American Typewriter", serif; font-size: 20px;font-weight:bold;}
+.subtitle {font-family: "American Typewriter", serif; font-size: 20px;font-weight:bold;}
+h3, h4 {font-family: "American Typewriter", serif; font-size: 20px;font-weight:bold;}
+p {font-family: "American Typewriter", serif;}
+
+.header {
+  border-bottom-color: #555;
+  font-size: 1.5rem;
+  font-weight: 700;
+  /*text-transform: uppercase;*/
+  color:#465362; 
+}
+/* Highlight headers when sorting */
+.header:hover,
+.header:focus,
+.header[aria-sort="ascending"],
+.header[aria-sort="descending"] {
+  background-color: #eee;
+}
+
+.manufacturer {
+  display: flex;
+  align-items: center;
+}
+.manufacturer-logo {
+  height: 2rem;
+  width: 4rem;
+  border: 1px solid #f0f0f0;
+}
+.manufacturer-name {
+  margin-left: 1rem;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color:#465362; 
+}
+.manufacturer-origin {
+  margin-left: 0.35rem;
+  color: hsl(0, 0%, 45%);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+a {color:#9F2B68;font-weight:normal}
+
+```
+
+
+```{css pkgdown_styles, include=FALSE}
+
+/* pkgdown articles */
+.row > main {
+  max-width: 1800px;
+}
+.page-header {
+  display: none;
+}
+/* rmarkdown html documents */
+.main-container {
+  max-width: 1600px !important;
+  margin-left: 80px;
+  margin-right: 80px;
+  color:#184558;
+  font-family: "American Typewriter", serif; 
+  font-size: 15px;
+}
+```
+
+
+</br>
+
+
+
